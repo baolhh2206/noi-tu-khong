@@ -1,0 +1,25 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Mỗi phòng chơi: games/{mã 4 ký tự}
+    match /games/{code} {
+      allow read: if request.auth != null;
+      // Tạo phòng: người tạo là chủ phòng
+      allow create: if request.auth != null
+        && code.matches('^[A-Z0-9]{4}$')
+        && request.resource.data.host == request.auth.uid;
+      // Cập nhật: chỉ chủ phòng hoặc người đang chơi trong ván, không được đổi chủ phòng
+      allow update: if request.auth != null
+        && request.resource.data.host == resource.data.host
+        && (request.auth.uid == resource.data.host
+            || request.auth.uid in resource.data.get('pids', []));
+      allow delete: if false;
+
+      // Danh sách người trong phòng chờ: mỗi người chỉ ghi được dòng của mình
+      match /players/{uid} {
+        allow read: if request.auth != null;
+        allow write: if request.auth != null && request.auth.uid == uid;
+      }
+    }
+  }
+}
