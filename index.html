@@ -573,7 +573,11 @@ async function joinRoom(code){
   const name=$("nick").value.trim().slice(0,16); if(!name){ $("nick").focus(); setStatus("Nhập tên trước đã.",true); return; }
   store.set("bnt-nick",name);
   const ref=db.doc("games/"+code);
-  let snap; try{ snap=await ref.get(); }catch(e){ setStatus("Không tải được phòng.",true); return; }
+  let snap;
+  for(let k=0;k<2&&!snap;k++){ // thử lại 1 lần nếu mạng chập chờn
+    try{ snap=await ref.get(); }
+    catch(e){ console.error("Lỗi tải phòng",e); if(k===1){ setStatus("Không tải được phòng "+code+" ("+(e.code||"")+": "+(e.message||e)+")",true); return; } await new Promise(r=>setTimeout(r,800)); }
+  }
   if(!snap.exists){ setStatus("Không tìm thấy phòng "+code+".",true); return; }
   const d=snap.data();
   const inGame=Array.isArray(d.players)&&d.players.some(p=>p.id===myId);
@@ -916,7 +920,7 @@ $("createBtn").disabled=true; $("joinBtn").disabled=true;
   try{
     if(noCfg||!window.firebase) throw new Error(noCfg?"noconfig":"nosdk");
     firebase.initializeApp(FIREBASE_CONFIG);
-    const fs=firebase.firestore(); try{ fs.settings({ignoreUndefinedProperties:true,merge:true}); }catch(e){}
+    const fs=firebase.firestore(); try{ fs.settings({ignoreUndefinedProperties:true,experimentalForceLongPolling:true,experimentalAutoDetectLongPolling:false,merge:true}); }catch(e){}
     const cred=await firebase.auth().signInAnonymously();
     myId=cred.user.uid; db=fs;
   }catch(e){ console.warn(e); db=null; myId=null;
